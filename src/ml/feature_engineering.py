@@ -78,28 +78,30 @@ def generate_base_features(
         cat_features, on='application_id', how='left'
     )
     final_df = final_df.merge(last_features, on='application_id', how='left')
+    logger.info("Пропуски final_df: %s", final_df.isna().sum())
+    final_df = final_df.dropna(axis='columns', how='any')
     logger.info("Все фичи объединены.")
+    logger.info("Размер final_df: %s", final_df.shape)
+
     return final_df
 
 
 def diff_dates(data: pd.DataFrame, feature_date: datetime) -> pd.DataFrame:
     """Преобразует даты в числа"""
     feature_date = pd.to_datetime(feature_date)
-
-    # Определяем колонки с датами
     date_columns = [col for col in data.columns if
                     pd.api.types.is_datetime64_any_dtype(
                         data[col]
-                    ) or 'date' in col.lower()]
+                        ) or 'date' in col.lower()]
+
+    result = data[['application_id']].copy()
 
     for col in date_columns:
         data[col] = pd.to_datetime(data[col], errors='coerce')
         data[col] = data[col].fillna(feature_date)
-        # Вычисляем разницу в днях от даты в конфиге
         diff_col_name = f"{col}_diff"
-        data[diff_col_name] = (feature_date - data[col]).dt.days
-
-    return data
+        result[diff_col_name] = (feature_date - data[col]).dt.days
+    return result.dropna(axis='columns')
 
 
 def fill_missing_values(df: pd.DataFrame, how: Any):

@@ -194,6 +194,8 @@ class FeatureAnalyser:
                     psi <= self.feature_thresholds.psi and
                     gini_over_time > self.feature_thresholds.gini_over_time):
                 self.selected_features.append(feature)
+                logger.info(f'feature_analyzer_selected_features '
+                            f'{self.selected_features}')
 
 
 class FeatureSelector:
@@ -203,6 +205,8 @@ class FeatureSelector:
         self.selected_features_corr = []
         self.selected_features_vif = []
         self.selected_features = []
+        logger.info(f'feature_selector_in_selected_features'
+                    f'{analyser.train_woe[analyser.selected_features].columns}')
 
     def calculate_correlation(self, threshold: float = 0.7):
         """Рассчитывает корреляцию между и фильтрует по порогу."""

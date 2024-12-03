@@ -10,9 +10,11 @@ from src.tools.logger import logger
 def merge_features_target(
     df_target: pd.DataFrame,
     df_features: pd.DataFrame,
+    df_dates: pd.DataFrame,
 ):
     """Подтягивает таргет, удаляет клиента, устанавливает индекс"""
     df_merged = df_target.merge(df_features, how='left', on=['application_id'])
+    df_merged = df_merged.merge(df_dates, how='left', on=['application_id'])
     #df_merged.drop(columns=['client_id'], inplace=True)
     df_merged.set_index('application_id', inplace=True)
     return df_merged

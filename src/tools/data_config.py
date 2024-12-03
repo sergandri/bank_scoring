@@ -5,6 +5,9 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List
 
+TARGET_LOCAL_PATH = 'eda/df_target_30k.csv'
+BKI_LOCAL_PATH = 'eda/df_BKI_30k.csv'
+
 FEATURE_DATE: datetime = datetime(2024, 11, 30)
 TARGET_COLUMN: str = 'target'
 BINNING_PATH = "binning_files"
