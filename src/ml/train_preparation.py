@@ -12,6 +12,7 @@ def merge_features_target(
     df_features: pd.DataFrame,
     df_dates: pd.DataFrame,
 ):
+    logger.info("Merging features and target...")
     """Подтягивает таргет, удаляет клиента, устанавливает индекс"""
     df_merged = df_target.merge(df_features, how='left', on=['application_id'])
     df_merged = df_merged.merge(df_dates, how='left', on=['application_id'])
@@ -22,6 +23,7 @@ def merge_features_target(
 
 def remove_non_numeric_features(df):
     """Удаляет из DataFrame все нечисловые признаки."""
+    logger.info("Removing unconverted features...")
     numeric_df = df.select_dtypes(include=['number'])
     return numeric_df
 
@@ -33,7 +35,7 @@ def t_t_split(
 ) -> tuple:
     if target_column not in df.columns:
         raise ValueError(
-            f"Таргет '{target_column}' отсутствует."
+            f"No target '{target_column}'"
         )
 
     train_data, test_data = train_test_split(

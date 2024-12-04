@@ -135,37 +135,36 @@ class FeatureConfig:
     ]
     agg_dict: Dict[str, str | list] = {
         # Простая статистика по счетам
-        'account_uid': ['count'],  # Количество кредитов
+        'account_uid': ['count'],  # Количество
         'fund_date': ['min', 'max', lambda x: (x.max() - x.min()).days],
         # Диапазон дат финансирования
         'trade_opened_dt': ['min', 'max', lambda x: (x.max() - x.min()).days],
         # Диапазон открытия сделок
         'trade_close_dt': ['min', 'max', lambda x: (x.max() - x.min()).days],
         # Диапазон закрытия сделок
-
-        # Финансы
+        'collat_insured_has_franchise': ['mean', 'sum', 'max'],
+        'collat_insured_insur_limit': ['mean', 'sum', 'max'],
+        # insured
         'account_amt_credit_limit': ['mean', 'max'],
         # Лимиты по кредитам
         'account_amt_ensured_amt': ['mean', 'max'],
         # Сумма обеспечений
-        'paymnt_condition_principal_terms_amt': ['mean', 'max', 'std'],
+        'paymnt_condition_principal_terms_amt': ['mean', 'max', 'sum'],
         # Основной долг
-        'paymnt_condition_interest_terms_amt': ['sum', 'mean', 'max', 'std'],
+        'paymnt_condition_interest_terms_amt': ['sum', 'mean', 'max'],
         # Процентная задолженность
-        'month_aver_paymt_aver_paymt_amt': ['sum', 'mean', 'max', 'std'],
+        'month_aver_paymt_aver_paymt_amt': ['sum', 'mean', 'max'],
         # Среднемесячные платежи
-
-        # Признаки наличия и типов
-        'trade_is_consumer_loan': ['sum', 'mean'],
+        'trade_is_consumer_loan': ['sum'],
         # Количество потребительских кредитов
-        'trade_has_card': ['sum', 'mean'],  # Количество кредитов с картами
-        'has_collaterals': ['sum', 'mean'],  # Количество кредитов с залогами
-        'has_guarantees': ['sum', 'mean'],
+        'trade_has_card': ['sum', 'max'],  # Количество кредитов с картами
+        'has_collaterals': ['sum', 'max'],  # Количество кредитов с залогами
+        'has_guarantees': ['sum', 'max'],
         # Количество кредитов с поручительством
 
         # Задолженности и просрочки
-        'arrear_sign': ['sum', 'mean'],  # Количество кредитов с задолженностью
-        'arrear_amt_outstanding': ['sum', 'mean', 'max'],
+        'arrear_sign': ['sum', 'max'],  # Количество кредитов с задолженностью
+        'arrear_amt_outstanding': ['sum', 'max'],
         # Суммарная задолженность
         'arrear_principal_outstanding': ['sum', 'mean', 'max'],
         # Основная задолженность
@@ -186,9 +185,45 @@ class FeatureConfig:
         # Финальные показатели
         'cred_max_overdue': ['max', 'mean', 'sum'],
         # Максимальная сумма просроченной задолженности
-        'attr_value': ['nunique', lambda x: x.value_counts().idxmax()],
+        'attr_value': ['nunique'],
         # Количество уникальных значений + самый частый статус
-
+        'max_delay_level': ['max', 'mean', 'sum'],
+        'total_delays': ['max', 'mean', 'sum'],
+        'delays_1_5_days': ['max', 'mean', 'sum'],
+        'delays_6_29_days': ['max', 'mean', 'sum'],
+        'delays_30_59_days': ['max', 'mean', 'sum'],
+        'delays_over_240_days': ['max', 'mean', 'sum'],
+        'on_time_periods': ['max', 'mean', 'sum'],
+        # Новые признаки из платежной строки
+        'credit_utilization_total_delay': ['max', 'mean', 'sum'],
+        'max_delay_arrear_outstanding': ['max', 'mean', 'sum'],
+        'arrear_over_total_credit': ['max', 'mean', 'sum'],
+        'principal_over_credit_limit': ['max', 'mean', 'sum'],
+        'bankruptcy_events': ['max', 'mean', 'sum'],
+        'debt_sold_events': ['max', 'mean', 'sum'],
+        'risk_category': ['max', 'mean', 'sum'],
+    }
+    priority_map: Dict[str, int] = {
+        '-': 0,  # Нет данных
+        '0': 1,  # Без просрочки
+        '1': 2,  # Просрочка 1-5 дней
+        '2': 3,  # Просрочка 6-29 дней
+        '3': 4,  # Просрочка 30-59 дней
+        '4': 5,  # Просрочка 60-89 дней
+        '5': 6,  # Просрочка 90-119 дней
+        '6': 7,  # Просрочка 120-149 дней
+        '7': 8,  # Просрочка 150-179 дней
+        '8': 9,  # Просрочка 180-209 дней
+        '9': 10,  # Просрочка 210-239 дней
+        'A': 11,  # Просрочка ≥ 240 дней
+        'B': 12,  # Безнадежный долг
+        'C': 0,  # Договор закрыт
+        'S': 0,  # Договор продан
+        'R': 0,  # Договор рефинансирован
+        'W': 13,  # Договор продан коллекторам
+        'U': 0,  # Договор расторгнут
+        'T': 14,  # Субъект КИ признан банкротом
+        'I': 0,  # Прекращена передача информации
     }
 
 

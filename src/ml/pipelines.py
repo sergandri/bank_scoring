@@ -18,9 +18,12 @@ from src.ml.binning import perform_train_binning
 from src.ml.train_preparation import t_t_split
 from src.tools.data_config import TARGET_COLUMN, split_config
 from src.ml.binning import perform_train_binning
-from src.tools.analysis import FeatureAnalyser
+from src.tools.analyzers import (
+    FeatureAnalyzer,
+    FeatureCalculator,
+    FeatureSelector,
+)
 from src.tools.data_config import feature_thresholds
-from src.tools.analysis import FeatureSelector
 from src.ml.model_training import FinalModelBuilder
 from src.tools.logger import logger
 
@@ -34,16 +37,17 @@ def full_preprocessing():
         generate_base_features,
         feature_config.agg_dict,
         feature_config.categorical_features,
-    ))
-    df_dates = diff_dates(df_aggr, feature_date=FEATURE_DATE)
-    df_aggr_w_target_n = (df_aggr.pipe(
-        merge_features_target,
-        df_target, df_dates
     )
-                          .pipe(remove_non_numeric_features)
-                          .pipe(fill_missing_values, how=0))
-
-    return df_aggr_w_target_n
+    )
+    df_f = (df_aggr.pipe(
+        merge_features_target,
+        df_target,
+        diff_dates(df_aggr, feature_date=FEATURE_DATE)
+    )
+            .pipe(remove_non_numeric_features)
+            .pipe(fill_missing_values, how=0)
+            )
+    return df_f
 
 
 def training(df_aggr_w_target_n: pd.DataFrame):
@@ -60,36 +64,30 @@ def training(df_aggr_w_target_n: pd.DataFrame):
         df_bki[['application_id', 'reporting_dt']].copy(deep=True)
         .drop_duplicates())
     df_report_dates.set_index('application_id', inplace=True)
-    feature_analyser = FeatureAnalyser(
+    feature_analyzer = FeatureAnalyzer(
         train_woe=train_woe, test_woe=test_woe,
         target_col=TARGET_COLUMN, df_dates=df_report_dates,
         feature_thresholds=feature_thresholds
     )
-    feature_analyser.run_analysis()
-    feature_analyser.save_results('factor_analysis.csv')
-    feature_analyser.log_results()
-    feature_analyser.filter_features()
+    feature_analyzer.run_analysis()
+    feature_analyzer.save_results('factor_analysis.csv')
+    feature_analyzer.log_results()
+    feature_analyzer.filter_features()
 
-    feature_selector = FeatureSelector(feature_analyser)
-    feature_selector.calculate_correlation()
-    feature_selector.calculate_vif()
-    feature_selector.calculate_total()
-    feature_selector.plot_gini_by_features()
+    feature_calculator = FeatureCalculator(feature_analyzer)
+    feature_calculator.calculate_correlation()
+    feature_calculator.calculate_vif()
+    feature_calculator.calculate_total()
+    feature_calculator.plot_gini_by_features()
 
-    binning_results = pd.read_csv('factor_analysis.csv')
-    feature_filter = feature_selector.selected_features
-    binning_results['indicator'] = binning_results['IV'] * 0.5 + \
-                                   binning_results['Gini Train'] * 0.25 + \
-                                   binning_results['Gini Test'] * 0.25
-    top_list = (binning_results.query('Feature in @feature_filter')
-                .sort_values('indicator', ascending=False).head(10))[
-        'Feature'].tolist()
-    top_list.append('target')
-    logger.info(f'toplist: {top_list}')
+    feature_selector = FeatureSelector(feature_analyzer, feature_calculator)
+    #feature_selector.select_best_features()
+    feature_selector.advanced_feature_selection()
+    feature_selector.manual_correction_features()
 
     final_model_builder = FinalModelBuilder(
-        train_data=train_woe[top_list],
-        test_data=test_woe[top_list],
+        train_data=train_woe[feature_selector.top_features],
+        test_data=test_woe[feature_selector.top_features],
         target_col=TARGET_COLUMN
     )
     final_model_builder.optimize_model()
@@ -97,4 +95,3 @@ def training(df_aggr_w_target_n: pd.DataFrame):
     final_model_builder.evaluate_model()
     final_model_builder.save_predictions()
     final_model_builder.save_model("final_model.pkl")
-

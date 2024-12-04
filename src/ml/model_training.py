@@ -61,14 +61,15 @@ class FinalModelBuilder:
                 'solver', ['lbfgs', 'liblinear', 'saga']
             )
             C = trial.suggest_float('C', 0.01, 10.0, log=True)
-            max_iter = trial.suggest_int('max_iter', 100, 1000)
+            max_iter = trial.suggest_int('max_iter', 500, 1000)
 
             model_params = {
                 'solver': solver,
                 'C': C,
                 'max_iter': max_iter,
                 'random_state': self.random_state,
-                'class_weight': 'balanced'
+                'class_weight': 'balanced',
+                'penalty': 'l2',
             }
 
             model = LogisticRegression(**model_params)
