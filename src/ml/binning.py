@@ -15,7 +15,7 @@ def woe_binning(
     features: list,
     target_column: str,
     min_bin_size: float = 0.05,
-    max_n_bins: int = 5,
+    max_n_bins: int = 6,
 
 
 ):
@@ -39,6 +39,7 @@ def woe_binning(
                 max_n_bins=max_n_bins,
                 outlier_detector='range',
                 class_weight='balanced',
+                monotonic_trend='auto_asc_desc',
             )
             opt_binning.fit(train_data[feature], train_data[target_column])
             binning_process_dict[feature] = opt_binning
@@ -109,15 +110,9 @@ def perform_train_binning(
                 f"Feature '{col}' constant - removed "
             )
             continue
-        # Проверяем на малое количество уникальных значений
-        if unique_values < 3:
-            logger.info(
-                f"Feature '{col}' has less than 3 values - removed"
-            )
-            continue
         # Проверяем на пропущенные значения
         missing_ratio = train_data[col].isnull().mean()
-        if missing_ratio > 0.5:
+        if missing_ratio > 0.4:
             logger.info(
                 f"Feature '{col}' has more than 50% missed values - removed"
             )

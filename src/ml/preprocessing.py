@@ -24,7 +24,7 @@ def convert_data_types(
         else:
             df[column] = df[column].astype(dtype)
 
-    return df
+    return df.sort_values(by='fund_date', ascending=False)
 
 
 def drop_features(df: pd.DataFrame) -> pd.DataFrame:

@@ -137,71 +137,80 @@ class FeatureConfig:
         # Простая статистика по счетам
         'account_uid': ['count'],  # Количество
         'fund_date': ['min', 'max', lambda x: (x.max() - x.min()).days],
-        # Диапазон дат финансирования
         'trade_opened_dt': ['min', 'max', lambda x: (x.max() - x.min()).days],
-        # Диапазон открытия сделок
         'trade_close_dt': ['min', 'max', lambda x: (x.max() - x.min()).days],
         # Диапазон закрытия сделок
-        'collat_insured_has_franchise': ['mean', 'sum', 'max'],
-        'collat_insured_insur_limit': ['mean', 'sum', 'max'],
+        'collat_insured_has_franchise': ['mean', 'sum', 'max', 'first'],
+        'collat_insured_insur_limit': ['mean', 'sum', 'max', 'first'],
         # insured
-        'account_amt_credit_limit': ['mean', 'max'],
+        'account_amt_credit_limit': ['mean', 'max', 'first'],
         # Лимиты по кредитам
-        'account_amt_ensured_amt': ['mean', 'max'],
+        'account_amt_ensured_amt': ['mean', 'max', 'first'],
         # Сумма обеспечений
-        'paymnt_condition_principal_terms_amt': ['mean', 'max', 'sum'],
+        'paymnt_condition_principal_terms_amt': ['mean', 'max', 'sum',
+                                                 'first'],
         # Основной долг
-        'paymnt_condition_interest_terms_amt': ['sum', 'mean', 'max'],
+        'paymnt_condition_interest_terms_amt': ['sum', 'mean', 'max', 'first'],
         # Процентная задолженность
-        'month_aver_paymt_aver_paymt_amt': ['sum', 'mean', 'max'],
+        'month_aver_paymt_aver_paymt_amt': ['sum', 'mean', 'max', 'first'],
         # Среднемесячные платежи
-        'trade_is_consumer_loan': ['sum'],
+        'trade_is_consumer_loan': ['first'],
         # Количество потребительских кредитов
-        'trade_has_card': ['sum', 'max'],  # Количество кредитов с картами
-        'has_collaterals': ['sum', 'max'],  # Количество кредитов с залогами
-        'has_guarantees': ['sum', 'max'],
+        'trade_owner_indic': ['first'],
+        'trade_trade_type_code': ['first'],
+        'trade_loan_kind_code': ['first'],
+        'trade_has_card': ['sum', 'max', 'first'],
+        # Количество кредитов с картами
+        'has_collaterals': ['sum', 'max', 'first'],
+        # Количество кредитов с залогами
+        'has_guarantees': ['sum', 'max', 'first'],
         # Количество кредитов с поручительством
 
         # Задолженности и просрочки
-        'arrear_sign': ['sum', 'max'],  # Количество кредитов с задолженностью
-        'arrear_amt_outstanding': ['sum', 'max'],
+        'arrear_sign': ['sum', 'max', 'first'],
+        # Количество кредитов с задолженностью
+        'arrear_amt_outstanding': ['sum', 'max', 'first'],
         # Суммарная задолженность
-        'arrear_principal_outstanding': ['sum', 'mean', 'max'],
+        'arrear_principal_outstanding': ['sum', 'mean', 'max', 'first'],
         # Основная задолженность
-        'arrear_int_outstanding': ['sum', 'mean', 'max'],
+        'arrear_int_outstanding': ['sum', 'mean', 'max', 'first'],
         # Процентная задолженность
-        'arrear_other_amt_outstanding': ['sum', 'mean', 'max'],
+        'arrear_other_amt_outstanding': ['sum', 'mean', 'max', 'first'],
         # Иные
-        'credit_utilization': ['sum', 'mean', 'max'],
-        'principal_interest_ratio': ['sum', 'mean', 'max'],
+        'credit_utilization': ['sum', 'mean', 'max', 'first'],
+        'principal_interest_ratio': ['sum', 'mean', 'max', 'first'],
 
         # История просрочек
-        'delay5': ['sum', 'mean'],  # Количество просрочек до 6 дней
-        'delay30': ['sum', 'mean'],  # Количество просрочек от 6 до 30 дней
-        'delay60': ['sum', 'mean'],  # Количество просрочек от 31 до 60 дней
-        'delay90': ['sum', 'mean'],  # Количество просрочек от 61 до 90 дней
-        'delay_more': ['sum', 'mean'],  # Количество просрочек более 90 дней
-        'total_delay': ['sum', 'mean'],
+        'delay5': ['sum', 'mean', 'first'],  # Количество просрочек до 6 дней
+        'delay30': ['sum', 'mean', 'first'],
+        # Количество просрочек от 6 до 30 дней
+        'delay60': ['sum', 'mean', 'first'],
+        # Количество просрочек от 31 до 60 дней
+        'delay90': ['sum', 'mean', 'first'],
+        # Количество просрочек от 61 до 90 дней
+        'delay_more': ['sum', 'mean', 'first'],
+        # Количество просрочек более 90 дней
+        'total_delay': ['sum', 'mean', 'first'],
         # Финальные показатели
-        'cred_max_overdue': ['max', 'mean', 'sum'],
+        'cred_max_overdue': ['max', 'mean', 'sum', 'first'],
         # Максимальная сумма просроченной задолженности
         'attr_value': ['nunique'],
         # Количество уникальных значений + самый частый статус
-        'max_delay_level': ['max', 'mean', 'sum'],
-        'total_delays': ['max', 'mean', 'sum'],
-        'delays_1_5_days': ['max', 'mean', 'sum'],
-        'delays_6_29_days': ['max', 'mean', 'sum'],
-        'delays_30_59_days': ['max', 'mean', 'sum'],
-        'delays_over_240_days': ['max', 'mean', 'sum'],
-        'on_time_periods': ['max', 'mean', 'sum'],
+        'max_delay_level': ['max', 'mean', 'sum', 'first'],
+        'total_delays': ['max', 'mean', 'sum', 'first'],
+        'delays_1_5_days': ['max', 'mean', 'sum', 'first'],
+        'delays_6_29_days': ['max', 'mean', 'sum', 'first'],
+        'delays_30_59_days': ['max', 'mean', 'sum', 'first'],
+        'delays_over_240_days': ['max', 'mean', 'sum', 'first'],
+        'on_time_periods': ['max', 'mean', 'sum', 'first'],
         # Новые признаки из платежной строки
-        'credit_utilization_total_delay': ['max', 'mean', 'sum'],
-        'max_delay_arrear_outstanding': ['max', 'mean', 'sum'],
-        'arrear_over_total_credit': ['max', 'mean', 'sum'],
-        'principal_over_credit_limit': ['max', 'mean', 'sum'],
-        'bankruptcy_events': ['max', 'mean', 'sum'],
-        'debt_sold_events': ['max', 'mean', 'sum'],
-        'risk_category': ['max', 'mean', 'sum'],
+        'credit_utilization_total_delay': ['max', 'mean', 'sum', 'first'],
+        'max_delay_arrear_outstanding': ['max', 'mean', 'sum', 'first'],
+        'arrear_over_total_credit': ['max', 'mean', 'sum', 'first'],
+        'principal_over_credit_limit': ['max', 'mean', 'sum', 'first'],
+        'bankruptcy_events': ['max', 'mean', 'sum', 'first'],
+        'debt_sold_events': ['max', 'mean', 'sum', 'first'],
+        'risk_category': ['max', 'mean', 'sum', 'first'],
     }
     priority_map: Dict[str, int] = {
         '-': 0,  # Нет данных

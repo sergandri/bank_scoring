@@ -24,7 +24,7 @@ from src.tools.analyzers import (
     FeatureSelector,
 )
 from src.tools.data_config import feature_thresholds
-from src.ml.model_training import FinalModelBuilder
+from src.ml.model_training import LRModelBuilder, CBModelBuilder
 from src.tools.logger import logger
 
 
@@ -85,13 +85,25 @@ def training(df_aggr_w_target_n: pd.DataFrame):
     feature_selector.advanced_feature_selection()
     feature_selector.manual_correction_features()
 
-    final_model_builder = FinalModelBuilder(
+    lr_model_builder = LRModelBuilder(
         train_data=train_woe[feature_selector.top_features],
         test_data=test_woe[feature_selector.top_features],
         target_col=TARGET_COLUMN
     )
-    final_model_builder.optimize_model()
-    final_model_builder.train_final_model()
-    final_model_builder.evaluate_model()
-    final_model_builder.save_predictions()
-    final_model_builder.save_model("final_model.pkl")
+    lr_model_builder.optimize_model()
+    lr_model_builder.train_final_model()
+    lr_model_builder.evaluate_model()
+    lr_model_builder.save_predictions()
+    lr_model_builder.save_model("final_model.pkl")
+
+    cb_model_builder = CBModelBuilder(
+        train_data = train_data,
+        test_data = test_data,
+        target_col=TARGET_COLUMN
+    )
+    cb_model_builder.optimize_model()
+    cb_model_builder.train_final_model()
+    cb_model_builder.evaluate_model()
+    cb_model_builder.save_predictions()
+    cb_model_builder.save_model("cb_model.cbm")
+
