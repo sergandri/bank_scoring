@@ -1,5 +1,6 @@
 from typing import List
 
+import joblib
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
@@ -8,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 from statsmodels.stats.outliers_influence import variance_inflation_factor
-from src.tools.data_config import FeatureThresholds
+from src.tools.data_config import FeatureThresholds, OUTPUT_PATH
 from src.tools.logger import logger
 
 
@@ -55,10 +56,16 @@ class FeatureAnalyzer:
         return iv
 
     @staticmethod
-    def calculate_gini(feature: pd.Series, target: pd.Series) -> float:
-        """Рассчитывает Gini."""
+    def calculate_gini(
+        feature: pd.Series,
+        target: pd.Series,
+        woe: bool = False
+    ) -> float:
+        """Считает Gini."""
+        if woe:
+            feature = - feature
         auc = roc_auc_score(target, feature)
-        gini = abs(2 * auc - 1)
+        gini = 2 * auc - 1
         return gini
 
     @staticmethod
@@ -120,17 +127,19 @@ class FeatureAnalyzer:
 
             # Рассчитываем Gini на тренировочной выборке
             gini_train = self.calculate_gini(
-                self.train_woe[feature], self.train_target
+                self.train_woe[feature],
+                self.train_target,
+                woe=True,
             )
             self.analysis_results["Gini Train"][feature] = gini_train
 
-            # Рассчитываем Gini на тестовой выборке
             gini_test = self.calculate_gini(
-                self.test_woe[feature], self.test_target
+                self.test_woe[feature],
+                self.test_target,
+                woe=True,
             )
             self.analysis_results["Gini Test"][feature] = gini_test
 
-            # Рассчитываем PSI по неделям, используя первую неделю как якорную
             gini_over_time = {}
             psi_values = {}
 
@@ -147,10 +156,10 @@ class FeatureAnalyzer:
                     gini_week = self.calculate_gini(
                         week_data[feature],
                         combined_target.loc[week_data.index],
+                        woe=True,
                     )
                     gini_over_time[str(week)] = gini_week
 
-                    # Рассчитываем PSI тек к якорной
                     psi_value = self.calculate_psi(
                         first_week_data,
                         week_data[feature],
@@ -170,16 +179,14 @@ class FeatureAnalyzer:
                 else:
                     logger.info(f"Feature: {feature}, {metric}: {value:.4f}")
 
-    def save_results(self, path: str):
-        """
-        Сохраняет результаты анализа в указанный путь в формате CSV.
-        """
+    def save_results(self, path: str = 'output_data/factor_analysis.csv'):
+        """Сэйвит результаты анализа"""
         results_df = pd.DataFrame(self.analysis_results)
         results_df.to_csv(path, index_label='Feature')
 
     def filter_features(self):
         """
-        Выполняет предварительный отбор фичей в модель согласно ограничениям
+        Выполняет отбор фичей в модель согласно ограничениям
         из конфигурации
         """
 
@@ -219,7 +226,7 @@ class FeatureCalculator:
             f'{analyser.train_woe[analyser.selected_features].columns}'
         )
 
-    def calculate_correlation(self, threshold: float = 0.7):
+    def calculate_correlation(self, threshold: float = 0.70):
         """Рассчитывает корреляцию между признаками и фильтрует по порогу."""
         corr_matrix = self.train_data.corr().abs()
         upper_triangle = corr_matrix.where(
@@ -232,18 +239,30 @@ class FeatureCalculator:
             if column in to_drop:
                 continue
             correlated_features = upper_triangle.index[
-                upper_triangle[column] > threshold].tolist()
-            to_drop.update(correlated_features)
+                upper_triangle[column] > threshold
+                ].tolist()
+            for feature in correlated_features:
+                # Сравниваем IV и удаляем признак с меньшим значением
+                iv_column = self.analyser.analysis_results["IV"].get(column, 0)
+                iv_feature = self.analyser.analysis_results["IV"].get(
+                    feature, 0
+                )
+                if iv_column >= iv_feature:
+                    to_drop.add(feature)
+                else:
+                    to_drop.add(column)
+                    break
 
         self.selected_features_corr = [col for col in corr_matrix.columns
                                        if col not in to_drop]
 
+        # Сохраняем отфильтрованную матрицу корреляции
         corr_results_df = corr_matrix.loc[
             self.selected_features_corr,
             self.selected_features_corr,
         ]
         corr_results_df.to_csv(
-            "correlation_filtered_features.csv",
+            f"{OUTPUT_PATH}/correlation_filtered_features.csv",
             index_label='Feature',
         )
 
@@ -258,7 +277,10 @@ class FeatureCalculator:
         self.selected_features_vif = vif_data[
             vif_data["VIF"] < 10]["Feature"].tolist()
 
-        vif_data.to_csv("vif_filtered_features.csv", index=False)
+        vif_data.to_csv(
+            f"{OUTPUT_PATH}/vif_filtered_features.csv",
+            index=False
+        )
 
     def calculate_total(self):
         self.selected_features = list(
@@ -278,10 +300,12 @@ class FeatureCalculator:
             train_gini = self.analyser.calculate_gini(
                 self.analyser.train_woe[selected_subset].sum(axis=1),
                 self.analyser.train_target,
+                woe=True,
             )
             test_gini = self.analyser.calculate_gini(
                 self.analyser.test_woe[selected_subset].sum(axis=1),
                 self.analyser.test_target,
+                woe=True,
             )
             train_ginis.append(train_gini)
             test_ginis.append(test_gini)
@@ -364,6 +388,10 @@ class FeatureSelector:
 
         # Сохраняем лучшие признаки
         self.top_features = selected_features
+        joblib.dump(
+            self.top_features,
+            f"{OUTPUT_PATH}/lr_features.pkl",
+        )
         self.top_features.append('target')
 
     def manual_correction_features(self):

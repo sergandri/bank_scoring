@@ -1,157 +1,95 @@
 from typing import Optional
-
 import pandas as pd
-from optbinning import OptimalBinning
-from src.tools.data_config import BINNING_FILE, TARGET_COLUMN
-import joblib
 import numpy as np
+from optbinning import OptimalBinning
+import joblib
 
+from src.tools.data_config import BINNING_FILE, OUTPUT_PATH
 from src.tools.logger import logger
 
 
-# Функция для подготовки и биннинга фичей
-def woe_binning(
-    train_data: pd.DataFrame,
-    features: list,
-    target_column: str,
-    min_bin_size: float = 0.05,
-    max_n_bins: int = 6,
+class Binner:
+    def __init__(
+        self,
+        min_bin_size: float = 0.05,
+        max_n_bins: int = 6,
+        outlier_detector: str = 'range',
+        class_weight: str = 'balanced',
+        monotonic_trend: str = 'auto_asc_desc'
+    ):
+        self.min_bin_size = min_bin_size
+        self.max_n_bins = max_n_bins
+        self.outlier_detector = outlier_detector
+        self.class_weight = class_weight
+        self.monotonic_trend = monotonic_trend
+        self.binning_dict = {}
+        self.features = None
+        self.train_data = None
+        self.train_woe = None
+        self.test_woe = None
 
+    def fit_binning(
+        self,
+        train_data: pd.DataFrame,
+        target_col: str,
+    ):
+        """
+        Обучает процесс биннинга на тренировочных данных в цикле для каждой фичи.
+        """
+        self.train_data = train_data
+        self.features = [col for col in self.train_data.columns if
+                         col != target_col]
 
-):
-    """
-    Делает WOE-биннинг для указанных фичей с использованием OptBinning.
-    :param train_data: pd.DataFrame, тренировочные данные
-    :param features: list, список фич для биннинга
-    :param target_column: str, имя колонки таргета
-    :param min_bin_size: float, минимальный размер бина
-    :param max_n_bins: float, максимальной количество бинов
-    :return: dict, словарь с биннерами для каждой переменной
-    """
-    binning_process_dict = {}
-    logger.info('Fitting binning process...')
-    for feature in features:
-        try:
-            opt_binning = OptimalBinning(
-                name=feature,
-                dtype="numerical",
-                min_bin_size=min_bin_size,
-                max_n_bins=max_n_bins,
-                outlier_detector='range',
-                class_weight='balanced',
-                monotonic_trend='auto_asc_desc',
-            )
-            opt_binning.fit(train_data[feature], train_data[target_column])
-            binning_process_dict[feature] = opt_binning
-        except Exception as e:
-            logger.warning(f"Binning feature error '{feature}': {e}")
-            continue
-    return binning_process_dict
+        X = self.train_data[self.features]
+        y = self.train_data[target_col]
 
+        for feature in self.features:
+            try:
+                opt_binning = OptimalBinning(
+                    name=feature,
+                    dtype="numerical",
+                    min_bin_size=self.min_bin_size,
+                    max_n_bins=self.max_n_bins,
+                    outlier_detector=self.outlier_detector,
+                    class_weight=self.class_weight,
+                    monotonic_trend=self.monotonic_trend
+                )
+                opt_binning.fit(X[feature], y)
+                self.binning_dict[feature] = opt_binning
+            except Exception as e:
+                print(f"Feature '{feature}' skipped due to error: {e}")
+                continue
 
-def transform_woe(df: pd.DataFrame, binning_dict: dict):
-    """
-    Применяет WOE-биннинг к данным.
-    :param df: pd.DataFrame, данные для трансформации
-    :param binning_dict: dict, словарь с биннерами
-    :return: pd.DataFrame, преобразованный датафрейм
-    """
-    logger.info('Binning transforming...')
-    df_transformed = df.copy()
+    def transform(
+        self,
+        df: pd.DataFrame,
+        target_col: Optional[str] = None,
+        metric: str = 'woe',
+    ):
+        """
+        Применяет WOE-трансформацию к данным в цикле для каждой фичи.
+        """
 
-    for feature, binning in binning_dict.items():
-        df_transformed[feature] = binning.transform(df[feature], metric="woe")
+        test_woe = df[self.features]
+        for feature, binning in self.binning_dict.items():
+            if feature in test_woe.columns:
+                test_woe[feature] = binning.transform(
+                    df[feature],
+                    metric=metric,
+                )
 
-    return df_transformed
+        if target_col in df.columns:
+            test_woe[target_col] = df[target_col]
 
+        return test_woe
 
-# Сохранение биннеров для дальнейшего использования
-def save_binning_process(
-    binning_dict: dict,
-    path: str = BINNING_FILE
-):
-    """
-    Сохраняет биннинг процесс в pickle файл.
-    :param binning_dict: dict, словарь с биннерами
-    :param path: str, путь к файлу для сохранения
-    """
-    logger.info('Saving binning process...')
-    joblib.dump(binning_dict, path)
+    def save(self, path: str = BINNING_FILE):
+        """Сохраняет биннинг-процесс в указанный путь."""
+        joblib.dump(self.binning_dict, path)
+        logger.info(f"Binning process saved to {path}")
 
-
-def load_all_binning_processes(file_path: str = BINNING_FILE):
-    """Загружает биннинг"""
-    logger.info(f"Loading binning from {file_path}...")
-    binning_dict = joblib.load(file_path)
-    return binning_dict
-
-
-def perform_train_binning(
-    train_data: pd.DataFrame,
-    test_data: pd.DataFrame,
-    target_column: str
-):
-    logger.info("Data types train_data:")
-    logger.info("%s", train_data.dtypes)
-
-    # Выбираем числовые признаки, исключая целевую переменную
-    numeric_cols = train_data.select_dtypes(
-        include=[np.number]
-    ).columns.tolist()
-    features = [col for col in numeric_cols if col != target_column]
-
-    # Фильтруем неподходящие признаки
-    suitable_features = []
-    for col in features:
-        # Проверяем на константность
-        unique_values = train_data[col].nunique(dropna=True)
-        if unique_values <= 1:
-            logger.info(
-                f"Feature '{col}' constant - removed "
-            )
-            continue
-        # Проверяем на пропущенные значения
-        missing_ratio = train_data[col].isnull().mean()
-        if missing_ratio > 0.4:
-            logger.info(
-                f"Feature '{col}' has more than 50% missed values - removed"
-            )
-            continue
-        # Проверяем на бесконечные значения
-        if np.isinf(train_data[col]).any():
-            logger.info(
-                f"Feature '{col}' has inf values - removed"
-            )
-            continue
-        suitable_features.append(col)
-
-    logger.info("Suitable for binning: %s", suitable_features)
-
-    if not suitable_features:
-        logger.error(
-            "No suitable features for binning"
-        )
-        # Возвращаем исходные данные без изменений
-        return train_data, test_data
-
-    # Вычисляем WOE-биннинг для указанных фич
-    binning_dict = woe_binning(train_data, suitable_features, target_column)
-
-    # Применяем WOE-трансформацию к тренировочным и тестовым данным
-    train_woe = transform_woe(train_data, binning_dict)
-    test_woe = transform_woe(test_data, binning_dict)
-
-    # Логирование результатов
-    logger.info(
-        "Columns train_data after binning: %s", train_woe.columns.tolist()
-    )
-    logger.info("Size train_data after binning: %s", train_woe.shape)
-    logger.info(
-        "Columns test_data after binning: %s", test_woe.columns.tolist()
-    )
-    logger.info("Size test_data after binning: %s", test_woe.shape)
-
-    # Сохранение биннинга для дальнейшего использования
-    save_binning_process(binning_dict, BINNING_FILE)
-
-    return train_woe, test_woe
+    def load(self, path: str = BINNING_FILE):
+        """Загружает сохраненный биннинг-процесс."""
+        self.binning_dict = joblib.load(path)
+        logger.info(f"Binning process loaded from {path}")
+        self.features = joblib.load(f"{OUTPUT_PATH}/lr_features.pkl")

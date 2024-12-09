@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import Any, List, Optional
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, confusion_matrix, \
     ConfusionMatrixDisplay, roc_curve
@@ -12,22 +12,46 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+from src.tools.data_config import OUTPUT_PATH
+from src.tools.logger import logger
+
 
 class BaseModelBuilder(ABC):
     def __init__(
         self,
-        train_data: pd.DataFrame,
+        train_data: Optional[pd.DataFrame],
         test_data: pd.DataFrame,
         target_col: str,
         model_name: str,
     ):
-        self.X = train_data.drop(columns=[target_col])
-        self.y = train_data[target_col]
-        self.X_test = test_data.drop(columns=[target_col])
-        self.y_test = test_data[target_col]
-        self.train_features, self.val_features, self.train_target, self.val_target = train_test_split(
-            self.X, self.y, test_size=0.2, random_state=42, stratify=self.y
-        )
+        if target_col in train_data.columns:
+            self.X = train_data.drop(columns=[target_col])
+            self.y = train_data[target_col]
+            (self.train_features,
+             self.val_features,
+             self.train_target,
+             self.val_target) = train_test_split(
+                self.X,
+                self.y,
+                test_size=0.2,
+                random_state=666,
+                stratify=self.y
+            )
+        else:
+            self.X = train_data
+            self.y = None
+            self.train_features = None
+            self.val_features = None
+            self.train_features = None
+            self.val_target = None
+
+        if target_col in test_data.columns:
+            self.X_test = test_data.drop(columns=[target_col])
+            self.y_test = test_data[target_col]
+        else:
+            self.X_test = test_data
+            self.y_test = None
+
         self.model = None
         self.best_params = None
         self.model_name = model_name
@@ -48,19 +72,28 @@ class BaseModelBuilder(ABC):
         pass
 
     @abstractmethod
-    def save_predictions(
+    def save_train_predictions(
         self, train_path: str, test_path: str, x_train_path: str,
         x_test_path: str
     ):
         """Сохранение предсказаний."""
         pass
 
+    @abstractmethod
+    def load_model(self):
+        """Загрузка модели из файла"""
+        pass
+
+    @abstractmethod
+    def save_real_predictions(self):
+        """Прогноз на неразмеченном тесте"""
+
     def evaluate_model(self):
         """Оценка качества модели на тестовой выборке."""
         predictions_proba = self.model.predict_proba(self.X_test)[:, 1]
         test_auc = roc_auc_score(self.y_test, predictions_proba)
         gini = 2 * test_auc - 1
-        print(f"Gini на тестовой выборке: {gini:.4f}")
+        logger.info(f"Gini на тестовой выборке: {gini:.4f}")
 
         y_pred = self.model.predict(self.X_test)
         cm = confusion_matrix(self.y_test, y_pred)
@@ -85,7 +118,10 @@ class BaseModelBuilder(ABC):
 class LRModelBuilder(BaseModelBuilder):
     def __init__(self, train_data, test_data, target_col="target"):
         super().__init__(
-            train_data, test_data, target_col, model_name="Logistic Regression"
+            train_data,
+            test_data,
+            target_col,
+            model_name="Logistic Regression",
         )
 
     def optimize_model(self):
@@ -115,15 +151,16 @@ class LRModelBuilder(BaseModelBuilder):
         self.model = LogisticRegression(**self.best_params)
         self.model.fit(self.X, self.y)
 
-    def save_model(self, path: str):
+    def save_model(self, path: str = f"{OUTPUT_PATH}/final_model.pkl"):
         joblib.dump(self.model, path)
-        print(f"Logistic Regression модель сохранена в {path}")
+        logger.info(f"Logistic Regression model saved {path}")
 
-    def save_predictions(
-        self, train_path="logreg_train_result.csv",
-        test_path="logreg_test_result.csv",
-        x_train_path="logreg_x_train_result.csv",
-        x_test_path="logreg_x_test_result.csv"
+    def save_train_predictions(
+        self,
+        train_path: str = f"{OUTPUT_PATH}/lr_train_result.csv",
+        test_path: str = f"{OUTPUT_PATH}/lr_test_result.csv",
+        x_train_path: str = f"{OUTPUT_PATH}/logreg_x_train_result.csv",
+        x_test_path: str = f"{OUTPUT_PATH}/logreg_x_test_result.csv"
     ):
         train_predictions = self.model.predict_proba(self.train_features)[:, 1]
         train_results = pd.DataFrame(
@@ -142,6 +179,25 @@ class LRModelBuilder(BaseModelBuilder):
             }
         )
         test_results.to_csv(test_path, index=False)
+
+    def load_model(self, path: str = f"{OUTPUT_PATH}/final_model.pkl"):
+        self.model = joblib.load(path)
+        logger.info(f"Model loaded from {path}")
+
+    def save_real_predictions(
+        self,
+        real_test_path: str = f"{OUTPUT_PATH}/real_lr_test_result.csv",
+        real_x_test_path: str = f"{OUTPUT_PATH}/real_lr_x_train_result.csv",
+    ):
+        self.X_test.to_csv(real_x_test_path, index=False)
+        test_predictions = self.model.predict_proba(self.X_test)[:, 1]
+        test_results = pd.DataFrame(
+            {
+                'Actual': self.y_test,
+                'Predicted Probability': test_predictions
+            }
+        )
+        test_results.to_csv(real_test_path, index=False)
 
 
 class CBModelBuilder(BaseModelBuilder):
@@ -193,26 +249,55 @@ class CBModelBuilder(BaseModelBuilder):
             return val_gini
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=15)
+        study.optimize(objective, n_trials=5)
         self.best_params = study.best_trial.params
-        print("Лучшие параметры:", self.best_params)
+        print("Best params:", self.best_params)
 
     def train_final_model(self):
         self.model = CatBoostClassifier(**self.best_params)
         train_pool = Pool(self.X, self.y, cat_features=self.cat_features)
         self.model.fit(train_pool)
 
-    def save_model(self, path: str):
-        self.model.save_model(path)
-        print(f"CatBoost model saved to {path}")
-        print(f"Feature Importances: {self.model.feature_importances_}")
-        self.plot_feature_importance()
+        feature_importances = self.model.get_feature_importance()
+        feature_names = self.X.columns
+        sorted_idx = np.argsort(feature_importances)[::-1]
+        top_35_idx = sorted_idx[:35]
+        top_35_features = feature_names[top_35_idx]
+        top_35_feature_names = list(top_35_features)
 
-    def save_predictions(
-        self, train_path="catboost_train_result.csv",
-        test_path="catboost_test_result.csv",
-        x_train_path="catboost_x_train_result.csv",
-        x_test_path="catboost_x_test_result.csv"
+        train_pool = Pool(
+            self.X[top_35_feature_names],
+            self.y,
+            cat_features=self.cat_features,
+        )
+        self.model = CatBoostClassifier(**self.best_params)
+        self.model.fit(train_pool)
+        joblib.dump(
+            top_35_feature_names,
+            f"{OUTPUT_PATH}/top_35_feature_names.pkl",
+        )
+
+
+    def save_model(self, path: str = f"{OUTPUT_PATH}/cb_model.cbm"):
+        self.model.save_model(path)
+        logger.info(f"CatBoost model saved to {path}")
+
+        # Вывод фич и их важности
+        feature_importances = self.model.get_feature_importance()
+        feature_names = self.X.columns
+        sorted_idx = np.argsort(feature_importances)[::-1]
+        logger.info("Feature Importances (Top Features):")
+        for idx in sorted_idx:
+            logger.info(
+                f"Feature: {feature_names[idx]}, Importance: {feature_importances[idx]}"
+            )
+
+    def save_train_predictions(
+        self,
+        train_path=f"{OUTPUT_PATH}/catboost_train_result.csv",
+        test_path=f"{OUTPUT_PATH}/catboost_test_result.csv",
+        x_train_path=f"{OUTPUT_PATH}/catboost_x_train_result.csv",
+        x_test_path=f"{OUTPUT_PATH}/catboost_x_test_result.csv"
     ):
         train_predictions = self.model.predict_proba(self.train_features)[:, 1]
         train_results = pd.DataFrame(
@@ -260,3 +345,36 @@ class CBModelBuilder(BaseModelBuilder):
         plt.title('ROC Curve')
         plt.legend()
         plt.show()
+
+    def load_model(self, path: str = f"{OUTPUT_PATH}/cb_model.cbm"):
+        """Загружает модель из указанного файла."""
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Model file not found at {path}")
+        self.model = CatBoostClassifier()
+        self.model.load_model(path)
+        logger.info(f"Model loaded from {path}")
+
+    def save_real_predictions(
+        self,
+        real_test_path: str = f"{OUTPUT_PATH}/real_cb_test_result.csv",
+        real_x_test_path: str = f"{OUTPUT_PATH}/real_cb_x_test_result.csv",
+    ):
+        """Сохраняет предсказания только на тестовых данных."""
+        if self.model is None:
+            raise ValueError(
+                "Model is not trained or loaded. "
+            )
+        top_35_feature_names = joblib.load(
+            f"{OUTPUT_PATH}/top_35_feature_names.pkl"
+        )
+        self.X_test[top_35_feature_names].to_csv(real_x_test_path, index=False)
+        test_predictions = self.model.predict_proba(
+            self.X_test[top_35_feature_names]
+        )[:, 1]
+        test_results = pd.DataFrame(
+            {
+                'Predicted Probability': test_predictions
+            }
+        )
+        test_results.to_csv(real_test_path, index=False)
+        logger.info(f"Test predictions saved to {real_test_path}")

@@ -1,4 +1,4 @@
-from src.ml.pipelines import full_preprocessing, training
+from src.ml.pipelines import train_full_preprocessing, training
 
 if __name__ == '__main__':
-    training(full_preprocessing())
+    training(train_full_preprocessing())

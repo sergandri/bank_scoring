@@ -5,13 +5,14 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List
 
-TARGET_LOCAL_PATH = 'eda/df_target_30k.csv'
-BKI_LOCAL_PATH = 'eda/df_BKI_30k.csv'
+TARGET_LOCAL_PATH = 'input_data/df_target_30k.csv'
+BKI_LOCAL_PATH = 'input_data/df_BKI_30k.csv'
+TEST_LOCAL_PATH = 'input_data/df_test_notarget_10k.csv'
 
-FEATURE_DATE: datetime = datetime(2024, 11, 30)
+FEATURE_DATE: datetime = datetime(2024, 12, 9)
 TARGET_COLUMN: str = 'target'
-BINNING_PATH = "binning_files"
-BINNING_FILE = os.path.join(BINNING_PATH, "all_binnings.pkl")
+OUTPUT_PATH: str = "output_data"
+BINNING_FILE = os.path.join(OUTPUT_PATH, "all_binnings.pkl")
 
 
 class FeatureThresholds:
@@ -25,7 +26,7 @@ class FeatureThresholds:
 
 class SplitConfig:
     test_size: float = 0.2
-    random_state: int = 777
+    random_state: int = 666
 
 
 class PreprocessConfig:
@@ -48,7 +49,6 @@ class PreprocessConfig:
         'trade_close_dt': 'datetime64[ns]',
         'account_amt_credit_limit': 'float64',
         'account_amt_currency_code': 'str',
-        'account_amt_ensured_amt': 'float64',
         'coborrower_has_solidary': 'float64',
         'coborrower_solidary_num': 'float64',
         'paymnt_condition_principal_terms_amt': 'float64',
@@ -71,7 +71,6 @@ class PreprocessConfig:
         'collat_insured_insur_sign': 'float64',
         'collat_insured_insur_limit': 'float64',
         'collat_insured_currency_code': 'str',
-        'collat_insured_has_franchise': 'float64',
         'collat_insured_insur_start_dt': 'datetime64[ns]',
         'collat_insured_insur_end_dt': 'datetime64[ns]',
         'collat_insured_insur_fact_end_dt': 'datetime64[ns]',
@@ -123,6 +122,107 @@ class PreprocessConfig:
         'cred_max_overdue': 'float64',
         'attr_value': 'object'
     }
+    fillna_logic: dict = {
+        'application_id': lambda x: x,  # пропусков быть не должно
+        'client_id': lambda x: x,  # пропусков быть не должно
+        'equifax_id': lambda x: x,  # пропусков быть не должно
+        'reporting_dt': lambda x: x,
+        # пропусков быть не должно
+        'account_uid': lambda x: x,  # пропусков быть не должно
+        'fund_date': lambda x: x,  # пропусков быть не должно
+        'trade_owner_indic': lambda x: x.fillna(99),
+        # Неопределенный тип участия
+        'trade_opened_dt': lambda x: x.fillna('1970-01-01'),
+        # Заполняем фиктивной датой
+        'trade_trade_type_code': lambda x: x.fillna(99),  # Иной тип сделки
+        'trade_loan_kind_code': lambda x: x.fillna(99),  # Иной вид займа
+        'trade_acct_type1': lambda x: x.fillna(99),
+        # Неопределенная цель займа
+        'trade_is_consumer_loan': lambda x: x.fillna(0),
+        # Предполагаем отсутствие потребительского кредита
+        'trade_has_card': lambda x: x.fillna(0),
+        # Предполагаем отсутствие карты
+        'trade_is_novation': lambda x: x.fillna(0),
+        # Предполагаем отсутствие новации
+        'trade_is_money_source': lambda x: x.fillna(0),
+        # Предполагаем отсутствие денежного обязательства
+        'trade_close_dt': lambda x: x,
+        # Оставляем пропуск
+        'account_amt_credit_limit': lambda x: x.fillna(0),
+        # Заполняем нулевым значением
+        'account_amt_currency_code': lambda x: x.fillna('unknown'),
+        # Заполняем фиктивным кодом валюты
+        'account_amt_ensured_amt': lambda x: x.fillna(0),
+        # Нулевая обеспеченная сумма
+        'coborrower_has_solidary': lambda x: x.fillna(0),
+        # Предполагаем отсутствие солидарных должников
+        'coborrower_solidary_num': lambda x: x.fillna(0),
+        # Нулевое количество солидарных должников
+        'paymnt_condition_principal_terms_amt': lambda x: x.fillna(0),
+        # Нулевая сумма платежа
+        'paymnt_condition_principal_terms_amt_dt': lambda x: x.fillna(
+            '1970-01-01'
+        ),  # Фиктивная дата платежа
+        'paymnt_condition_interest_terms_amt': lambda x: x.fillna(0),
+        # Нулевая сумма процентов
+        'paymnt_condition_interest_terms_amt_dt': lambda x: x.fillna(
+            '1970-01-01'
+        ),  # Фиктивная дата процентов
+        'paymnt_condition_terms_frequency': lambda x: x.fillna(99),
+        # Иная частота платежей
+        'paymnt_condition_min_paymt': lambda x: x.fillna(0),
+        # Нулевой минимальный платеж
+        'paymnt_condition_grace_start_dt': lambda x: x.fillna('1970-01-01'),
+        # Фиктивная дата начала льготного периода
+        'paymnt_condition_grace_end_dt': lambda x: x.fillna('1970-01-01'),
+        # Фиктивная дата окончания льготного периода
+        'paymnt_condition_interest_payment_due_date': lambda x: x,
+        # Фиктивная дата уплаты процентов
+        'overall_val_credit_total_amt': lambda x: x.fillna(0),
+        # Заполняем 0
+        'overall_val_credit_total_monetary_amt': lambda x: x.fillna(0),
+        # Заполняем 0
+        'overall_val_credit_total_amt_date': lambda x: x,
+        'month_aver_paymt_aver_paymt_amt': lambda x: x.fillna(x.median()),
+        # Заполняем медианным значением
+        'month_aver_paymt_calc_date': lambda x: x.fillna('1970-01-01'),
+        # Фиктивная дата расчета
+        'has_collaterals': lambda x: x.fillna(0),  # Отсутствие залога
+        'has_guarantees': lambda x: x.fillna(0),  # Отсутствие поручительства
+        'has_indie_guarantees': lambda x: x.fillna(0),
+        # Отсутствие независимой гарантии
+        'collat_insured_insur_sign': lambda x: x.fillna(0),
+        # Отсутствие страхования
+        'collat_insured_insur_limit': lambda x: x.fillna(0),
+        # Нулевой лимит страховых выплат
+        'collat_insured_currency_code': lambda x: x.fillna('unknown'),
+        # Фиктивная валюта
+        'collat_insured_has_franchise': lambda x: x.fillna(0),
+        # Отсутствие франшизы
+        'collat_insured_insur_start_dt': lambda x: x.fillna('1970-01-01'),
+        # Фиктивная дата начала страхования
+        'collat_insured_insur_end_dt': lambda x: x,
+        # Фиктивная дата окончания страхования
+        'collat_insured_insur_fact_end_dt': lambda x: x,
+        # Фиктивная дата фактического окончания
+        'collat_insured_insur_end_reason': lambda x: x.fillna(99),
+        # Иная причина окончания страхования
+        'colat_repaid': lambda x: x.fillna(0),
+        # Отсутствие погашения за счет обеспечения
+        'loan_indicator': lambda x: x,
+        # Иное основание прекращения обязательства
+        'loan_indicator_dt': lambda x: x,
+        # оставляем пропуск
+        'legal_items_has_legal_dispute': lambda x: x.fillna(0),
+        # Отсутствие судебного акта
+        'legal_items_court_act_dt': lambda x: x.fillna('1970-01-01'),
+        # Фиктивная дата судебного акта
+        'legal_items_court_act_effect_code': lambda x: x.fillna(0),
+        # Акт не вступил в законную силу
+        'attr_value': lambda x: x.fillna('-'),  # Отсутствие данных
+        'past_due_principal_missed_date': lambda x: x,
+        'past_due_int_missed_date': lambda x: x,
+    }
 
 
 class FeatureConfig:
@@ -134,97 +234,85 @@ class FeatureConfig:
         'arrear_last_payment_due_code',
     ]
     agg_dict: Dict[str, str | list] = {
-        # Простая статистика по счетам
-        'account_uid': ['count'],  # Количество
+        # как буду агрегировать
+        'account_uid': ['count'],
         'fund_date': ['min', 'max', lambda x: (x.max() - x.min()).days],
         'trade_opened_dt': ['min', 'max', lambda x: (x.max() - x.min()).days],
         'trade_close_dt': ['min', 'max', lambda x: (x.max() - x.min()).days],
-        # Диапазон закрытия сделок
         'collat_insured_has_franchise': ['mean', 'sum', 'max', 'first'],
-        'collat_insured_insur_limit': ['mean', 'sum', 'max', 'first'],
-        # insured
         'account_amt_credit_limit': ['mean', 'max', 'first'],
-        # Лимиты по кредитам
         'account_amt_ensured_amt': ['mean', 'max', 'first'],
-        # Сумма обеспечений
         'paymnt_condition_principal_terms_amt': ['mean', 'max', 'sum',
                                                  'first'],
-        # Основной долг
         'paymnt_condition_interest_terms_amt': ['sum', 'mean', 'max', 'first'],
-        # Процентная задолженность
         'month_aver_paymt_aver_paymt_amt': ['sum', 'mean', 'max', 'first'],
-        # Среднемесячные платежи
         'trade_is_consumer_loan': ['first'],
-        # Количество потребительских кредитов
         'trade_owner_indic': ['first'],
         'trade_trade_type_code': ['first'],
         'trade_loan_kind_code': ['first'],
         'trade_has_card': ['sum', 'max', 'first'],
-        # Количество кредитов с картами
         'has_collaterals': ['sum', 'max', 'first'],
-        # Количество кредитов с залогами
         'has_guarantees': ['sum', 'max', 'first'],
-        # Количество кредитов с поручительством
-
-        # Задолженности и просрочки
         'arrear_sign': ['sum', 'max', 'first'],
-        # Количество кредитов с задолженностью
         'arrear_amt_outstanding': ['sum', 'max', 'first'],
-        # Суммарная задолженность
         'arrear_principal_outstanding': ['sum', 'mean', 'max', 'first'],
-        # Основная задолженность
         'arrear_int_outstanding': ['sum', 'mean', 'max', 'first'],
-        # Процентная задолженность
         'arrear_other_amt_outstanding': ['sum', 'mean', 'max', 'first'],
-        # Иные
         'credit_utilization': ['sum', 'mean', 'max', 'first'],
         'principal_interest_ratio': ['sum', 'mean', 'max', 'first'],
-
-        # История просрочек
-        'delay5': ['sum', 'mean', 'first'],  # Количество просрочек до 6 дней
+        'delay5': ['sum', 'mean', 'first'],
         'delay30': ['sum', 'mean', 'first'],
-        # Количество просрочек от 6 до 30 дней
         'delay60': ['sum', 'mean', 'first'],
-        # Количество просрочек от 31 до 60 дней
         'delay90': ['sum', 'mean', 'first'],
-        # Количество просрочек от 61 до 90 дней
         'delay_more': ['sum', 'mean', 'first'],
-        # Количество просрочек более 90 дней
         'total_delay': ['sum', 'mean', 'first'],
-        # Финальные показатели
         'cred_max_overdue': ['max', 'mean', 'sum', 'first'],
-        # Максимальная сумма просроченной задолженности
         'attr_value': ['nunique'],
-        # Количество уникальных значений + самый частый статус
-        'max_delay_level': ['max', 'mean', 'sum', 'first'],
-        'total_delays': ['max', 'mean', 'sum', 'first'],
-        'delays_1_5_days': ['max', 'mean', 'sum', 'first'],
-        'delays_6_29_days': ['max', 'mean', 'sum', 'first'],
-        'delays_30_59_days': ['max', 'mean', 'sum', 'first'],
-        'delays_over_240_days': ['max', 'mean', 'sum', 'first'],
-        'on_time_periods': ['max', 'mean', 'sum', 'first'],
-        # Новые признаки из платежной строки
-        'credit_utilization_total_delay': ['max', 'mean', 'sum', 'first'],
-        'max_delay_arrear_outstanding': ['max', 'mean', 'sum', 'first'],
-        'arrear_over_total_credit': ['max', 'mean', 'sum', 'first'],
-        'principal_over_credit_limit': ['max', 'mean', 'sum', 'first'],
-        'bankruptcy_events': ['max', 'mean', 'sum', 'first'],
-        'debt_sold_events': ['max', 'mean', 'sum', 'first'],
-        'risk_category': ['max', 'mean', 'sum', 'first'],
+        'AV_max_delay_level': ['max', 'mean', 'sum', 'first'],
+        'AV_total_delays': ['max', 'mean', 'sum', 'first'],
+        'AV_delays_1_5_days': ['max', 'mean', 'sum', 'first'],
+        'AV_delays_6_29_days': ['max', 'mean', 'sum', 'first'],
+        'AV_delays_30_59_days': ['max', 'mean', 'sum', 'first'],
+        'AV_delays_over_240_days': ['max', 'mean', 'sum', 'first'],
+        'AV_on_time_periods': ['max', 'mean', 'sum', 'first'],
+        'AV_credit_utilization_total_delay': ['max', 'mean', 'sum', 'first'],
+        'AV_max_delay_arrear_outstanding': ['max', 'mean', 'sum', 'first'],
+        'AV_arrear_over_total_credit': ['max', 'mean', 'sum', 'first'],
+        'AV_principal_over_credit_limit': ['max', 'mean', 'sum', 'first'],
+        'AV_bankruptcy_events': ['max', 'mean', 'sum', 'first'],
+        'AV_debt_sold_events': ['max', 'mean', 'sum', 'first'],
+        'AV_risk_category': ['max', 'mean', 'first'],
+        'AV_overdue_ratio': ['mean', 'sum', 'max', 'first'],
+        'AV_on_time_ratio': ['mean', 'max', 'first'],
+        'AV_max_on_time_length': ['mean', 'max', 'first'],
+        'AV_max_overdue_length': ['mean', 'max', 'first'],
+        'AV_first_overdue_position': ['min', 'mean', 'first'],
+        'AV_unique_segments': ['mean', 'max', 'sum'],
+        'AV_avg_distance_overdues': ['mean', 'max', 'first'],
+        'AV_cumulative_risk_score': ['mean', 'max', 'first'],
+        'AV_on_time_segment_count': ['mean', 'max', 'sum'],
+        'AV_high_risk_segments': ['mean', 'sum', 'first'],
+        'AV_mixed_risk_segments': ['mean', 'sum', 'first'],
+        'D_past_due_principal_missed_binary': ['mean', 'sum', 'max', 'first'],
+        'D_past_due_int_missed_binary': ['mean', 'sum', 'max', 'first'],
+        'D_past_due_any_missed_binary': ['mean', 'sum', 'max', 'first'],
+        'D_loan_indicator_dt_binary': ['mean', 'sum', 'max', 'first'],
+        'D_trade_close_dt_binary': ['mean', 'sum', 'max', 'first'],
+        'D_past_due_sum_missed': ['mean', 'sum', 'max', 'first'],
     }
     priority_map: Dict[str, int] = {
         '-': 0,  # Нет данных
         '0': 1,  # Без просрочки
-        '1': 2,  # Просрочка 1-5 дней
-        '2': 3,  # Просрочка 6-29 дней
-        '3': 4,  # Просрочка 30-59 дней
-        '4': 5,  # Просрочка 60-89 дней
-        '5': 6,  # Просрочка 90-119 дней
-        '6': 7,  # Просрочка 120-149 дней
-        '7': 8,  # Просрочка 150-179 дней
-        '8': 9,  # Просрочка 180-209 дней
-        '9': 10,  # Просрочка 210-239 дней
-        'A': 11,  # Просрочка ≥ 240 дней
+        '1': 2,  # 1-5 дней
+        '2': 3,  # 6-29 дней
+        '3': 4,  # 0-59 дней
+        '4': 5,  # 60-89 дней
+        '5': 6,  # 90-119 дней
+        '6': 7,  # 120-149 дней
+        '7': 8,  # 150-179 дней
+        '8': 9,  # 180-209 дней
+        '9': 10,  # 210-239 дней
+        'A': 11,  # ≥ 240 дней
         'B': 12,  # Безнадежный долг
         'C': 0,  # Договор закрыт
         'S': 0,  # Договор продан
