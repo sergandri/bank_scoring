@@ -16,13 +16,13 @@ optbinning = "^0.20.0"
 statsmodels = "^0.14.4"
 optuna = "^4.1.0"
 catboost = "^1.2.7"
-
+matplotlib = "^3.9.2"
+seaborn = "^0.13.2"
 
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.1.1"
 ipykernel = "^6.29.5"
-matplotlib = "^3.9.2"
-seaborn = "^0.13.2"
+
 
 [build-system]
 requires = ["poetry-core"]
