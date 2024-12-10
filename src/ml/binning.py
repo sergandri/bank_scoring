@@ -34,7 +34,8 @@ class Binner:
         target_col: str,
     ):
         """
-        Обучает процесс биннинга на тренировочных данных в цикле для каждой фичи.
+        Обучает процесс биннинга на тренировочных данных в
+        цикле для каждой фичи.
         """
         self.train_data = train_data
         self.features = [col for col in self.train_data.columns if
@@ -67,7 +68,7 @@ class Binner:
         metric: str = 'woe',
     ):
         """
-        Применяет WOE-трансформацию к данным в цикле для каждой фичи.
+        Применяет WOE-трансформацию.
         """
 
         test_woe = df[self.features]

@@ -63,7 +63,7 @@ class FeatureAnalyzer:
     ) -> float:
         """Считает Gini."""
         if woe:
-            feature = - feature
+            feature = - feature # тут надо вытащить ивент рейт и подставить его
         auc = roc_auc_score(target, feature)
         gini = 2 * auc - 1
         return gini
@@ -79,7 +79,7 @@ class FeatureAnalyzer:
         :param expected: pd.Series, якорная выборка (первая неделя)
         :param actual: pd.Series, текущая выборка
         :param bins: int, количество бинов для расчета
-        :return: float, значение PSI
+        :return: float, ПСИ
         """
         expected_hist, bin_edges = np.histogram(expected, bins=bins)
         actual_hist, _ = np.histogram(actual, bins=bin_edges)
@@ -102,7 +102,6 @@ class FeatureAnalyzer:
         combined_data = pd.concat([self.train_woe, self.test_woe])
         combined_target = pd.concat([self.train_target, self.test_target])
 
-        # Добавляем даты из df_dates
         if self.df_dates is not None:
             combined_data = combined_data.join(
                 self.df_dates,
@@ -121,11 +120,9 @@ class FeatureAnalyzer:
             )
 
         for feature in self.train_woe.columns:
-            # Рассчитываем IV на тренировочной выборке
             iv = self.calculate_iv(self.train_woe[feature], self.train_target)
             self.analysis_results["IV"][feature] = iv
 
-            # Рассчитываем Gini на тренировочной выборке
             gini_train = self.calculate_gini(
                 self.train_woe[feature],
                 self.train_target,
@@ -170,7 +167,7 @@ class FeatureAnalyzer:
             self.analysis_results["PSI"][feature] = psi_values
 
     def log_results(self):
-        """Логирует результаты анализа."""
+        """Логирует результаты типа анализа. (очень большой лог получился)"""
         for metric, results in self.analysis_results.items():
             logger.info(f"\n{metric} Results:")
             for feature, value in results.items():
@@ -256,7 +253,6 @@ class FeatureCalculator:
         self.selected_features_corr = [col for col in corr_matrix.columns
                                        if col not in to_drop]
 
-        # Сохраняем отфильтрованную матрицу корреляции
         corr_results_df = corr_matrix.loc[
             self.selected_features_corr,
             self.selected_features_corr,
@@ -283,6 +279,7 @@ class FeatureCalculator:
         )
 
     def calculate_total(self):
+        """Сегодня мы с тобой фильтруем"""
         self.selected_features = list(
             set(self.selected_features_corr).intersection(
                 set(self.selected_features_vif)
@@ -342,6 +339,7 @@ class FeatureSelector:
         self.top_features: List[str] | None = None
 
     def select_best_features(self):
+        """Выбирает лучшее из лучшего"""
         binning_results = pd.DataFrame(self.feature_analyzer.analysis_results)
         binning_results.reset_index(inplace=True)
         binning_results['indicator'] = binning_results['IV'] * 0.5 + \
@@ -356,37 +354,30 @@ class FeatureSelector:
         self.top_features = top_list
 
     def advanced_feature_selection(self, n_features=10):
-        """
-        Отбор ровно 10 наиболее важных признаков с использованием RFE.
-        """
+        """Отбор ровно 10 наиболее важных признаков"""
         x = self.feature_calculator.train_data[
             self.feature_calculator.selected_features
         ]
         y = self.feature_analyzer.train_target
         logger.info("Начало отбора признаков с использованием RFE.")
 
-        # Инициализируем модель
         model = LogisticRegression(
             solver='liblinear',
             random_state=666,
             class_weight='balanced'
         )
 
-        # Инициализируем RFE с указанием числа признаков для отбора
         rfe = RFE(
             estimator=model,
             n_features_to_select=n_features,
             step=1
         )
 
-        # Обучаем RFE
         rfe.fit(x, y)
 
-        # Получаем выбранные признаки
         selected_features = x.columns[rfe.support_].tolist()
         logger.info(f"RFE selected features: {selected_features}")
 
-        # Сохраняем лучшие признаки
         self.top_features = selected_features
         joblib.dump(
             self.top_features,
@@ -395,6 +386,7 @@ class FeatureSelector:
         self.top_features.append('target')
 
     def manual_correction_features(self):
+        """Корректирует руками на всякий случай"""
         features_to_remove: list = []
         features_to_add: list = []
         for i in features_to_remove:

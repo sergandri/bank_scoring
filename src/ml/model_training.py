@@ -332,9 +332,7 @@ class CBModelBuilder(BaseModelBuilder):
         plt.show()
 
     def plot_roc_curve(self):
-        """
-        Строит ROC-кривую для оценки качества модели.
-        """
+        """Строит ROC-кривую для оценки качества модели."""
         test_predictions = self.model.predict_proba(self.X_test)[:, 1]
         fpr, tpr, _ = roc_curve(self.y_test, test_predictions)
         plt.figure(figsize=(10, 6))
