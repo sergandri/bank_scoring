@@ -80,7 +80,6 @@ def drop_features(
     threshold: float = 0.95,
 ):
     """Очищает датасет, удаляя ненужные признаки."""
-    # 1. Удаление признаков с большим количеством пропусков
     missing_percentage = df.isnull().mean()
     cols_to_drop = missing_percentage[
         missing_percentage > threshold].index.tolist()
@@ -89,10 +88,9 @@ def drop_features(
         f" {cols_to_drop}"
     )
 
-    # 2. Ручное удаление
+    # Ручное удаление
     id_cols = ['client_id']
 
-    # 3. Итог
     all_cols_to_drop = set(cols_to_drop + id_cols)
     if target_col in all_cols_to_drop:
         all_cols_to_drop.remove(target_col)  # Таргет не должен быть удален

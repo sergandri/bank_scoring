@@ -10,7 +10,6 @@ from src.tools.data_config import feature_config
 
 
 def count_char(attr_value, char_set):
-    """Подсчитывает количество символов из указанного набора в строке."""
     return sum(1 for c in attr_value if c in char_set)
 
 
@@ -64,16 +63,22 @@ def count_unique_segments(attr_value: str, char_set: str) -> int:
     segments = re.findall(pattern, attr_value)
     return len(set(segments))
 
+
 def avg_distance_between_overdues(attr_value: str, char_set: str) -> float:
     positions = [i for i, c in enumerate(attr_value) if c in char_set]
     if len(positions) < 2:
         return 0
     return np.mean(np.diff(positions))
 
-def cumulative_risk_score(attr_value: str, priority_map:
-dict=feature_config.priority_map) -> float:
-    return sum(priority_map.get(char, 0) * (i + 1) for i, char in enumerate(attr_value))
 
+def cumulative_risk_score(
+    attr_value: str, priority_map:
+    dict = feature_config.priority_map
+) -> float:
+    return sum(
+        priority_map.get(char, 0) * (i + 1) for i, char in
+        enumerate(attr_value)
+    )
 
 
 def create_new_features(df: pd.DataFrame) -> pd.DataFrame:
