@@ -193,7 +193,7 @@ class LRModelBuilder(BaseModelBuilder):
         test_predictions = self.model.predict_proba(self.X_test)[:, 1]
         test_results = pd.DataFrame(
             {
-                'Actual': self.y_test,
+                'application_id': self.X_test.index,
                 'Predicted Probability': test_predictions
             }
         )
@@ -255,6 +255,7 @@ class CBModelBuilder(BaseModelBuilder):
 
     def train_final_model(self):
         self.model = CatBoostClassifier(**self.best_params)
+        self.X.drop(columns=['client_id'], inplace=True)
         train_pool = Pool(self.X, self.y, cat_features=self.cat_features)
         self.model.fit(train_pool)
 
@@ -276,7 +277,6 @@ class CBModelBuilder(BaseModelBuilder):
             top_35_feature_names,
             f"{OUTPUT_PATH}/top_35_feature_names.pkl",
         )
-
 
     def save_model(self, path: str = f"{OUTPUT_PATH}/cb_model.cbm"):
         self.model.save_model(path)
@@ -371,6 +371,7 @@ class CBModelBuilder(BaseModelBuilder):
         )[:, 1]
         test_results = pd.DataFrame(
             {
+                'application_id': self.X_test.index,
                 'Predicted Probability': test_predictions
             }
         )

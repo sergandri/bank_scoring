@@ -342,9 +342,9 @@ class FeatureSelector:
         """Выбирает лучшее из лучшего"""
         binning_results = pd.DataFrame(self.feature_analyzer.analysis_results)
         binning_results.reset_index(inplace=True)
-        binning_results['indicator'] = binning_results['IV'] * 0.5 + \
-                                       binning_results['Gini Train'] * 0.25 + \
-                                       binning_results['Gini Test'] * 0.25
+        binning_results['indicator'] = binning_results['IV'] * 0.7 + \
+                                       binning_results['Gini Train'] * 0.15 + \
+                                       binning_results['Gini Test'] * 0.15
         feature_filter = self.feature_calculator.selected_features
         top_list = (binning_results.query('index in @feature_filter')
                     .sort_values('indicator', ascending=False).head(10))[
